@@ -8,7 +8,98 @@ import os
 from PIL import ImageTk, Image
 import Tkconstants, tkFileDialog
 
+def dnd_start(source, event):
+    h = DndHandler(source, event)
+    if h.root:
+        return h
+    else:
+        return None
 
+class DndHandler:
+ 
+    root = None
+ 
+    def __init__(self, source, event):
+        if event.num > 5:
+            return
+        root = event.widget._root()
+        try:
+            root.__dnd
+            return # Don't start recursive dnd
+        except AttributeError:
+            root.__dnd = self
+            self.root = root
+        self.source = source
+        self.target = None
+        self.initial_button = button = event.num
+        self.initial_widget = widget = event.widget
+        self.release_pattern = "<B%d-ButtonRelease-%d>" % (button, button)
+        self.save_cursor = widget['cursor'] or ""
+        widget.bind(self.release_pattern, self.on_release)
+        widget.bind("<Motion>", self.on_motion)
+        widget['cursor'] = "hand2"
+ 
+    def __del__(self):
+        root = self.root
+        self.root = None
+        if root:
+            try:
+                del root.__dnd
+            except AttributeError:
+                pass
+ 
+    def on_motion(self, event):
+        x, y = event.x_root, event.y_root
+        target_widget = self.initial_widget.winfo_containing(x, y)
+        source = self.source
+        new_target = None
+        while target_widget:
+            try:
+                attr = target_widget.dnd_accept
+            except AttributeError:
+                pass
+            else:
+                new_target = attr(source, event)
+                if new_target:
+                    break
+            target_widget = target_widget.master
+        old_target = self.target
+        if old_target is new_target:
+            if old_target:
+                old_target.dnd_motion(source, event)
+        else:
+            if old_target:
+                self.target = None
+                old_target.dnd_leave(source, event)
+            if new_target:
+                new_target.dnd_enter(source, event)
+                self.target = new_target
+ 
+    def on_release(self, event):
+        self.finish(event, 1)
+ 
+    def cancel(self, event=None):
+        self.finish(event, 0)
+ 
+    def finish(self, event, commit=0):
+        target = self.target
+        source = self.source
+        widget = self.initial_widget
+        root = self.root
+        try:
+            del root.__dnd
+            self.initial_widget.unbind(self.release_pattern)
+            self.initial_widget.unbind("<Motion>")
+            widget['cursor'] = self.save_cursor
+            self.target = self.source = self.initial_widget = self.root = None
+            if target:
+                if commit:
+                    target.dnd_commit(source, event)
+                else:
+                    target.dnd_leave(source, event)
+        finally:
+            source.dnd_end(target, event)
+            
 class GUI(tk.Frame):
     """Main GUI class"""
     def __init__(self, parent, *args, **kwargs):
@@ -31,6 +122,7 @@ class GUI(tk.Frame):
         
         self.project_explorer = ProjectExplorer(self.root, '/home/armando/Documents/Software/PDGS_GUI/testprojects')
         self.menubar = Menubar(self.root, workspace_path, self.project_explorer)
+        self.building_area = BuildingArea(self.root)
         
         self.Frame1 = tk.Frame(self.root, bg="grey")
         self.Frame2 = tk.Frame(self.root, bg="blue")
@@ -41,7 +133,7 @@ class GUI(tk.Frame):
     
         self.menubar.grid(row=0, column=0, rowspan=1, columnspan=10, sticky=(tk.N, tk.S, tk.W, tk.E))
         self.project_explorer.grid(row=1, column=0, rowspan=15, columnspan=2, sticky=(tk.N, tk.S, tk.W, tk.E))
-        self.Frame2.grid(row=1, column=2, rowspan=15, columnspan=8, sticky=(tk.N, tk.S, tk.W, tk.E))
+        self.building_area.grid(row=1, column=2, rowspan=15, columnspan=8, sticky=(tk.N, tk.S, tk.W, tk.E))
         self.Frame5.grid(row=16, column=0, rowspan=4, columnspan=10, sticky=(tk.N, tk.S, tk.W, tk.E))
 
         for r in range(20):
@@ -700,47 +792,263 @@ class Tabs(tk.Frame):
         nb.add(page2, text='Tab2')
  
  
+
+class ToggledFrame(tk.Frame):
+
+    def __init__(self, parent, text="", *args, **options):
+        tk.Frame.__init__(self, parent, *args, **options)
+        self.text = text
+        self.show = tk.IntVar()
+        self.show.set(0)
+
+        self.title_frame = ttk.Frame(self)
+        self.title_frame.pack(fill="x", expand=1)
+
+        tk.Label(self.title_frame, text=text).pack(side="left", fill="x", expand=1)
+
+        self.toggle_button = tk.Checkbutton(self.title_frame, width=2, text='+', command=self.toggle,
+                                            variable=self.show)
+        self.toggle_button.pack(side="left")
+
+        self.sub_frame = tk.Frame(self, relief="sunken", borderwidth=1)
+        
+        self.canvas = tk.Canvas(self.sub_frame, height=500)
+        self.canvas.pack(fill="both")
+        self.canvas.dnd_accept = self.dnd_accept
+
+    def toggle(self):
+        if bool(self.show.get()):
+            self.sub_frame.pack(fill="both", expand=1)
+            self.toggle_button.configure(text='-')
+        else:
+            self.sub_frame.forget()
+            self.toggle_button.configure(text='+')
+ 
+    def dnd_accept(self, source, event):
+        return self
+ 
+    def dnd_enter(self, source, event):
+        self.canvas.focus_set() # Show highlight border
+        x, y = source.where(self.canvas, event)
+        x1, y1, x2, y2 = source.canvas.bbox(source.id)#Source Resources and Information.)
+        dx, dy = x2-x1, y2-y1
+        self.dndid = self.canvas.create_rectangle(x, y, x+dx, y+dy)
+        self.dnd_motion(source, event)
+ 
+    def dnd_motion(self, source, event):
+        x, y = source.where(self.canvas, event)
+        x1, y1, x2, y2 = self.canvas.bbox(self.dndid)
+        self.canvas.move(self.dndid, x-x1, y-y1)
+ 
+    def dnd_leave(self, source, event):
+        #self.top.focus_set() # Hide highlight border
+        self.canvas.delete(self.dndid)
+        self.dndid = None
+ 
+    def dnd_commit(self, source, event):
+        self.dnd_leave(source, event)
+        x, y = source.where(self.canvas, event)
+        source.attach(self.canvas, x, y)
+
+class CustomButton(tk.Canvas):
+    def __init__(self, parent, width, height, color, command=None):
+        tk.Canvas.__init__(self, parent, borderwidth=1, 
+            relief="raised", highlightthickness=0)
+        self.command = command
+
+        padding = 4
+        id = self.create_oval((padding,padding,
+            width+padding, height+padding), outline=color, fill=color)
+        (x0,y0,x1,y1)  = self.bbox("all")
+        width = (x1-x0) + padding
+        height = (y1-y0) + padding
+        self.configure(width=width, height=height)
 #==============================================================================
+#         self.bind("<ButtonPress-1>", self._on_press)
+#         self.bind("<ButtonRelease-1>", self._on_release)
 # 
-# class ToggledFrame(tk.Frame):
+#     def _on_press(self, event):
+#         self.configure(relief="sunken")
 # 
-#     def __init__(self, parent, text="", *args, **options):
-#         tk.Frame.__init__(self, parent, *args, **options)
-# 
-#         self.show = tk.IntVar()
-#         self.show.set(0)
-# 
-#         self.title_frame = ttk.Frame(self)
-#         self.title_frame.pack(fill="x", expand=1)
-# 
-#         ttk.Label(self.title_frame, text=text).pack(side="left", fill="x", expand=1)
-# 
-#         self.toggle_button = ttk.Checkbutton(self.title_frame, width=2, text='+', command=self.toggle,
-#                                             variable=self.show, style='Toolbutton')
-#         self.toggle_button.pack(side="left")
-# 
-#         self.sub_frame = tk.Frame(self, relief="sunken", borderwidth=1)
-# 
-#     def toggle(self):
-#         if bool(self.show.get()):
-#             self.sub_frame.pack(fill="x", expand=1)
-#             self.toggle_button.configure(text='-')
-#         else:
-#             self.sub_frame.forget()
-#             self.toggle_button.configure(text='+')
-# 
-# 
-# if __name__ == "__main__":
-#     root = tk.Tk()
-# 
-#     t = ToggledFrame(root, text='Rotate', relief="raised", borderwidth=1)
-#     t.pack(fill="x", expand=1, pady=2, padx=2, anchor="n")
+#     def _on_release(self, event):
+#         self.configure(relief="raised")
+#         if self.command is not None:
+#             self.command()
+#==============================================================================
+
+class DrawArea(tk.Frame):
+ 
+    def __init__(self, root):
+        tk.Frame.__init__(self, root, bg='white')
+        self.canvas = tk.Canvas(self)
+        self.canvas.pack(fill="both", expand=1)
+        self.canvas.dnd_accept = self.dnd_accept
+ 
+    def dnd_accept(self, source, event):
+        return self
+ 
+    def dnd_enter(self, source, event):
+        self.canvas.focus_set() # Show highlight border
+        x, y = source.where(self.canvas, event)
+        x1, y1, x2, y2 = source.canvas.bbox(source.id)#Source Resources and Information.)
+        dx, dy = x2-x1, y2-y1
+        self.dndid = self.canvas.create_rectangle(x, y, x+dx, y+dy)
+        self.dnd_motion(source, event)
+ 
+    def dnd_motion(self, source, event):
+        x, y = source.where(self.canvas, event)
+        x1, y1, x2, y2 = self.canvas.bbox(self.dndid)
+        self.canvas.move(self.dndid, x-x1, y-y1)
+ 
+    def dnd_leave(self, source, event):
+        self.canvas.delete(self.dndid)
+        self.dndid = None
+ 
+    def dnd_commit(self, source, event):
+        self.dnd_leave(source, event)
+        x, y = source.where(self.canvas, event)
+        source.attach(self.canvas, x, y)
+        
+        
+class Icon:
+ 
+    def __init__(self, name, shape='rect'):
+        self.name = name
+        self.shape = shape
+        self.canvas = self.label = self.id = None
+ 
+    def attach(self, canvas, x=10, y=10):
+        if canvas is self.canvas:
+            self.canvas.coords(self.id, x, y)
+            return
+        if self.canvas:
+            self.detach()
+        if not canvas:
+            return
+        if 'rect' in self.shape :
+            label = tk.Label(canvas, text=self.name,
+                                  borderwidth=2, relief="raised", padx=10, pady=10)    
+        elif 'circular' in self.shape :
+            label = CustomButton(canvas, 50, 50, 'grey')
+            
+        id = canvas.create_window(x, y, window=label, anchor="nw") 
+           
+        self.canvas = canvas
+        self.label = label
+        self.id = id
+        label.bind("<ButtonPress>", self.press)
+ 
+    def detach(self):
+        canvas = self.canvas
+        if not canvas:
+            return
+        id = self.id
+        label = self.label
+        self.canvas = self.label = self.id = None
+        canvas.delete(id)
+        label.destroy()
+ 
+    def press(self, event):
+        if dnd_start(self, event):
+            # where the pointer is relative to the label widget:
+            self.x_off = event.x
+            self.y_off = event.y
+            # where the widget is relative to the canvas:
+            self.x_orig, self.y_orig = self.canvas.coords(self.id)
+            copy = Icon(self.name, self.shape)
+            copy.attach(self.canvas, self.x_orig, self.y_orig)
+ 
+    def move(self, event):
+        x, y = self.where(self.canvas, event)
+        self.canvas.coords(self.id, x, y)
+ 
+    def putback(self):
+        self.canvas.coords(self.id, self.x_orig, self.y_orig)
+ 
+    def where(self, canvas, event):
+        # where the corner of the canvas is relative to the screen:
+        x_org = canvas.winfo_rootx()
+        y_org = canvas.winfo_rooty()
+        # where the pointer is relative to the canvas widget:
+        x = event.x_root - x_org
+        y = event.y_root - y_org
+        # compensate for initial pointer offset
+        return x - self.x_off, y - self.y_off
+ 
+    def dnd_end(self, target, event):
+        pass
+
+class BuildingArea(tk.Frame):
+    '''Illustrate how to drag items on a Tkinter canvas'''
+
+    def __init__(self, parent):
+        tk.Frame.__init__(self, parent)
+        self.root = parent
+        self.init_gui()
+    
+    def init_gui(self): 
+        
+        self.draw_area = DrawArea(self)
+        self.pallete = tk.Frame(self)
+        
+        self.draw_area.grid(row=0, column=0, rowspan=4, columnspan=3, sticky=(tk.N, tk.S, tk.W, tk.E))
+        self.pallete.grid(row=0, column=3, rowspan=4, columnspan=1, sticky=(tk.N, tk.S, tk.W, tk.E))
+   
+        self.fields = ToggledFrame(self.pallete, text='Fields', relief="raised", borderwidth=1)
+        self.fields.pack(fill="x", pady=2, padx=2, anchor="ne")
+       
+        self.constructs = ToggledFrame(self.pallete, text='Constructs', relief="raised", borderwidth=1)
+        self.constructs.pack(fill="x", expand=1, pady=2, padx=2, anchor="ne")
+        
+        for r in range(4):
+            self.rowconfigure(r, weight=1)
+        for c in range(4):
+            self.columnconfigure(c, weight=1)
+        
+        self.init_fields()
+
+    def init_fields(self):
+        self.icons = [
+                        Icon("Start Field", shape='circular'),
+                        Icon("Field (2 Byte)"),
+                        Icon("Field (8 Byte)"),
+                        Icon("Field (8 Byte)"),
+                        Icon("Field (Var size)"),
+                        Icon("Reference List"),
+                        Icon("Field (1 Byte)"),
+                        Icon("Field (4 Byte)"),
+                        Icon("Field (16 Byte)"),
+                        Icon("Field (16 Byte)"),
+                        Icon("End Field"),
+                        Icon("Packet Info.")   
+                     ]
+               
+        for i in range(6):        
+            y = i*80+30
+            self.icons[i].attach(self.fields.canvas, y=y)  
+            self.icons[i+6].attach(self.fields.canvas, x=350, y=y)    
+      
+            
+                          
+        
+        
+#==============================================================================
+#         self.pallete = tk.Frame(self)
+#         
+#         self.fields = ToggledFrame(self.pallete, text='Fields', relief="raised", borderwidth=1)
+#         self.fields.pack(fill="x", expand=1, pady=2, padx=2, anchor="n")
+#         
+#         self.t2 = ToggledFrame(self.pallete, text='Constructs', relief="raised", borderwidth=1)
+#         self.t2.pack(fill="x", expand=1, pady=2, padx=2, anchor="n")
+#         
+#         self.pallete.grid(row=1, column=1, sticky='ew')
+#==============================================================================
+
 # 
 #     ttk.Label(t.sub_frame, text='Rotation [deg]:').pack(side="left", fill="x", expand=1)
 #     ttk.Entry(t.sub_frame).pack(side="left")
 # 
-#     t2 = ToggledFrame(root, text='Resize', relief="raised", borderwidth=1)
-#     t2.pack(fill="x", expand=1, pady=2, padx=2, anchor="n")
+#    
 # 
 #     for i in range(10):
 #         ttk.Label(t2.sub_frame, text='Test' + str(i)).pack()
@@ -750,63 +1058,6 @@ class Tabs(tk.Frame):
 # 
 #     for i in range(10):
 #         ttk.Label(t3.sub_frame, text='Bar' + str(i)).pack()
-#==============================================================================
-
-
-class Example(tk.Frame):
-    '''Illustrate how to drag items on a Tkinter canvas'''
-
-    def __init__(self, parent):
-        tk.Frame.__init__(self, parent)
-
-        # create a canvas
-        self.canvas = tk.Canvas(width=400, height=400)
-        self.canvas.grid(row=2, column=0)
-
-        # this data is used to keep track of an 
-        # item being dragged
-        self._drag_data = {"x": 0, "y": 0, "item": None}
-
-        # create a couple of movable objects
-        self._create_token((100, 100), "white")
-        self._create_token((200, 100), "black")
-
-        # add bindings for clicking, dragging and releasing over
-        # any object with the "token" tag
-        self.canvas.tag_bind("token", "<ButtonPress-1>", self.on_token_press)
-        self.canvas.tag_bind("token", "<ButtonRelease-1>", self.on_token_release)
-        self.canvas.tag_bind("token", "<B1-Motion>", self.on_token_motion)
-
-    def _create_token(self, coord, color):
-        '''Create a token at the given coordinate in the given color'''
-        (x,y) = coord
-        self.canvas.create_oval(x-25, y-25, x+25, y+25, 
-                                outline=color, fill=color, tags="token")
-
-    def on_token_press(self, event):
-        '''Begining drag of an object'''
-        # record the item and its location
-        self._drag_data["item"] = self.canvas.find_closest(event.x, event.y)[0]
-        self._drag_data["x"] = event.x
-        self._drag_data["y"] = event.y
-
-    def on_token_release(self, event):
-        '''End drag of an object'''
-        # reset the drag information
-        self._drag_data["item"] = None
-        self._drag_data["x"] = 0
-        self._drag_data["y"] = 0
-
-    def on_token_motion(self, event):
-        '''Handle dragging of an object'''
-        # compute how much the mouse has moved
-        delta_x = event.x - self._drag_data["x"]
-        delta_y = event.y - self._drag_data["y"]
-        # move the object the appropriate amount
-        self.canvas.move(self._drag_data["item"], delta_x, delta_y)
-        # record the new position
-        self._drag_data["x"] = event.x
-        self._drag_data["y"] = event.y
         
 
 
