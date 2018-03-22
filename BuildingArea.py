@@ -2,7 +2,10 @@ import Tkinter as tk
 import ttk
 from CustomWidgets import RhombusButton
 from CustomWidgets import ArrowButton
-from CustomWidgets import CircularButtonw
+from CustomWidgets import CircularButton
+from CustomWidgets import PopUp
+from CustomWidgets import HeaderFrame
+from Menu import OrganizeViews
 
 def dnd_start(source, event):
     h = DndHandler(source, event)
@@ -185,14 +188,22 @@ class DrawArea(tk.Frame):
         self.dnd_leave(source, event)
         x, y = source.where(self.canvas, event)
         source.attach(self.canvas, x, y)
+    
+    def close(self):
+        OrganizeViews.diss_flag.set(0)
+        self.grid_forget() 
+    
+    def show_exp(self):
+        self.draw_area.grid(row=0, column=0, rowspan=4, columnspan=3, sticky=(tk.N, tk.S, tk.W, tk.E))
         
         
 class Icon:
  
-    def __init__(self, name, shape='rect'):
+    def __init__(self, name, shape='rect', command=None):
         self.name = name
         self.shape = shape
         self.canvas = self.label = self.id = None
+        self.command = command
  
     def attach(self, canvas, x=10, y=10):
         if canvas is self.canvas:
@@ -206,7 +217,7 @@ class Icon:
             label = tk.Label(canvas, text=self.name,
                                   borderwidth=2, relief="raised", padx=10, pady=10)    
         elif 'circular' in self.shape :
-            label = CircularButton(canvas, 50, 50, 'grey')
+            label = CircularButton(canvas, 50, 50, 'grey', self.name)
         elif 'rhombus' in self.shape:
             label = RhombusButton(canvas, 300, 150, 'grey')
         else:
@@ -236,7 +247,7 @@ class Icon:
             self.y_off = event.y
             # where the widget is relative to the canvas:
             self.x_orig, self.y_orig = self.canvas.coords(self.id)
-            copy = Icon(self.name, self.shape)
+            copy = Icon(self.name, self.shape, command=self.command)
             copy.attach(self.canvas, self.x_orig, self.y_orig)
  
     def move(self, event):
@@ -257,7 +268,8 @@ class Icon:
         return x - self.x_off, y - self.y_off
  
     def dnd_end(self, target, event):
-        pass
+        if self.command:
+            self.command()
 
 class DndFrame(tk.Frame):
     def __init__(self, root, text, width=100, height=100):
@@ -300,50 +312,50 @@ class DndFrame(tk.Frame):
         x, y = source.where(self.canvas, event)
         source.attach(self.canvas, x, y)
         
-class BuildingArea(tk.Frame):
+class BuildingArea(HeaderFrame):
     '''Illustrate how to drag items on a Tkinter canvas'''
 
-    def __init__(self, parent):
-        tk.Frame.__init__(self, parent)
+    def __init__(self, parent, text):
+        HeaderFrame.__init__(self, parent, text)
         self.root = parent
         self.init_gui()
     
     def init_gui(self): 
-        
-        self.draw_area = DrawArea(self)
-        self.pallete = tk.Frame(self)
+        self.draw_area = DrawArea(self.sub_frame)
+        self.pallete = HeaderFrame(self.sub_frame, 'Palette')
+        self.pallete.close = self.hide_pallete
         
         self.draw_area.grid(row=0, column=0, rowspan=4, columnspan=3, sticky=(tk.N, tk.S, tk.W, tk.E))
         self.pallete.grid(row=0, column=3, rowspan=4, columnspan=1, sticky=(tk.N, tk.S, tk.W, tk.E))
    
-        self.fields = Section(self.pallete, text='Fields', relief="raised", borderwidth=1)
+        self.fields = Section(self.pallete.sub_frame, text='Fields', relief="raised", borderwidth=1)
         self.fields.pack(fill="x", pady=2, padx=2, anchor="ne")
        
-        self.constructs = Section(self.pallete, text='Constructs', relief="raised", borderwidth=1)
+        self.constructs = Section(self.pallete.sub_frame, text='Constructs', relief="raised", borderwidth=1)
         self.constructs.pack(fill="x", expand=1, pady=2, padx=2, anchor="ne")
         
         for r in range(4):
-            self.rowconfigure(r, weight=1)
+            self.sub_frame.rowconfigure(r, weight=1)
         for c in range(4):
-            self.columnconfigure(c, weight=1)
+            self.sub_frame.columnconfigure(c, weight=1)
         
         self.init_fields()
         self.init_constructs()
 
     def init_fields(self):
         self.icons = [
-                        Icon("Start Field", shape='circular'),
-                        Icon("Field (2 Byte)"),
-                        Icon("Field (8 Byte)"),
-                        Icon("Field (8 Byte)"),
-                        Icon("Field (Var size)"),
-                        Icon("Reference List"),
-                        Icon("Field (1 Byte)"),
-                        Icon("Field (4 Byte)"),
-                        Icon("Field (16 Byte)"),
-                        Icon("Field (16 Byte)"),
-                        Icon("End Field"),
-                        Icon("Packet Info.")   
+                        Icon("S", shape='circular', command=self.start_field_popup),
+                        Icon("Field (2 Byte)", command=self.var_popup),
+                        Icon("Field (8 Byte)",command=self.var_popup),
+                        Icon("Field (8 Byte)",command=self.var_popup),
+                        Icon("Field (Var size)",command=self.var_popup),
+                        Icon("Reference List", command=self.ref_popup),
+                        Icon("Field (1 Byte)",command=self.var_popup),
+                        Icon("Field (4 Byte)",command=self.var_popup),
+                        Icon("Field (16 Byte)", command=self.var_popup),
+                        Icon("Field (16 Byte)", command=self.var_popup),
+                        Icon("E", shape='circular'),
+                        Icon("Packet Info.", command=self.pack_popup)   
                      ]
                
         for i in range(6):        
@@ -351,6 +363,24 @@ class BuildingArea(tk.Frame):
             self.icons[i].attach(self.fields.canvas, y=y)  
             self.icons[i+6].attach(self.fields.canvas, x=350, y=y)
     
+    def var_popup(self):
+        print('hola')
+        self.var_win = tk.Toplevel(self.root) # Set parent
+        Variable(self.var_win, self)
+                
+    def start_field_popup(self):
+        self.start_win = tk.Toplevel(self.root) # Set parent
+        StartField(self.start_win, self)
+    
+    def ref_popup(self):
+        self.ref_win = tk.Toplevel(self.root) # Set parent
+        ReferenceList(self.ref_win, self)
+    
+    def pack_popup(self):
+        self.pack_win = tk.Toplevel(self.root) # Set parent
+        PacketInfo(self.pack_win, self)        
+        
+        
     def init_constructs(self):
         self.constructs.canvas.destroy()
         
@@ -398,3 +428,225 @@ class BuildingArea(tk.Frame):
                      
         self.operand = Icon("Operand")
         self.operand.attach(self.expression.canvas)  
+        
+    def hide_pallete(self):
+        self.pallete.forget_grid()
+        
+    def show_pallete(self):
+        self.pallete.grid(row=0, column=3, rowspan=4, columnspan=1, sticky=(tk.N, tk.S, tk.W, tk.E))
+    
+    def close(self):
+        self.grid_forget()
+    
+    def show_build(self):
+        self.grid(row=1, column=2, rowspan=15, columnspan=8, sticky=(tk.N, tk.S, tk.W, tk.E))
+
+class Variable(PopUp):
+    """ New popup window """
+    REF_OPTIONS = ["List 1", 'List 2']
+    BASE_OPTIONS = ["64", '8', '2']
+    DATA_TYPE_OPTIONS = ["Int", 'Str', 'Double']
+    
+    def init_gui(self):
+        self.parent.title("Field")
+        self.parent.columnconfigure(0, weight=1)
+        self.parent.rowconfigure(3, weight=1)
+
+        # Create Widgets
+        self.contentframe = ttk.Frame(self.parent, relief="sunken")
+        
+        self.labels = [
+            tk.Label(self.contentframe, text="Name: "),
+            tk.Label(self.contentframe, text="Abbreviation: "),
+            tk.Label(self.contentframe, text="Description: "),
+            tk.Label(self.contentframe, text="Reference List: "),
+            tk.Label(self.contentframe, text="Data Type: "),
+            tk.Label(self.contentframe, text="Base: "),
+            tk.Label(self.contentframe, text="Mask: "),
+            tk.Label(self.contentframe, text="Value Constraints: "),
+            tk.Label(self.contentframe, text="Required: ")
+        ]
+        
+        
+        self.ref = tk.StringVar(self.contentframe)
+        self.ref.set(self.REF_OPTIONS[0]) # default value
+        
+        self.base = tk.StringVar(self.contentframe)
+        self.base.set(self.BASE_OPTIONS[0]) # default value
+        
+        self.data = tk.StringVar(self.contentframe)
+        self.data.set(self.DATA_TYPE_OPTIONS[0]) # default value
+        
+        self.inputs = [
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe),
+            tk.OptionMenu(self.contentframe, self.ref, *self.REF_OPTIONS),
+            tk.OptionMenu(self.contentframe, self.base, *self.BASE_OPTIONS),
+            tk.OptionMenu(self.contentframe, self.data, *self.DATA_TYPE_OPTIONS),
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe),
+            tk.Checkbutton(self.contentframe)
+        ]
+        
+        for i in range(len(self.labels)):
+            self.labels[i].grid(row=i, column=0)
+        for i in range(len(self.labels)):
+            self.inputs[i].grid(row=i, column=1, sticky='ew')
+            
+        self.btn_do = tk.Button(self.contentframe, text='Launch', command=self.do_something)
+        self.btn_cancel = tk.Button(self.contentframe, text='Cancel', command=self.close_win)
+
+
+        self.btn_do.grid(row=len(self.labels), column=0, sticky='e')
+        self.btn_cancel.grid(row=len(self.labels), column=1, sticky='e')
+        
+        #
+
+        # Padding
+        for child in self.parent.winfo_children():
+            child.grid_configure(padx=10, pady=5)
+        for child in self.contentframe.winfo_children():
+            child.grid_configure(padx=5, pady=2)
+    
+    def do_something(self):
+        self.close_win()
+
+class StartField(PopUp):
+    """ New popup window """
+    REF_OPTIONS = ["List 1", 'List 2']
+    BASE_OPTIONS = ["64", '8', '2']
+    DATA_TYPE_OPTIONS = ["Int", 'Str', 'Double']
+    
+    def init_gui(self):
+        self.parent.title("Start Field")
+        self.parent.columnconfigure(0, weight=1)
+        self.parent.rowconfigure(3, weight=1)
+
+        # Create Widgets
+        self.contentframe = ttk.Frame(self.parent, relief="sunken")
+        
+        self.labels = [
+            tk.Label(self.contentframe, text="Protocol Name: "),
+            tk.Label(self.contentframe, text="Protocol Description: "),
+            tk.Label(self.contentframe, text="Dependent Protocol Name: "),
+            tk.Label(self.contentframe, text="Dependency Pattern: "),
+        ]
+        
+        
+        self.ref = tk.StringVar(self.contentframe)
+        self.ref.set(self.REF_OPTIONS[0]) # default value
+        
+        self.base = tk.StringVar(self.contentframe)
+        self.base.set(self.BASE_OPTIONS[0]) # default value
+        
+        self.data = tk.StringVar(self.contentframe)
+        self.data.set(self.DATA_TYPE_OPTIONS[0]) # default value
+        
+        self.inputs = [
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe),
+            tk.Entry(self.contentframe)
+        ]
+        
+        for i in range(len(self.labels)):
+            self.labels[i].grid(row=i, column=0)
+        for i in range(len(self.labels)):
+            self.inputs[i].grid(row=i, column=1, sticky='ew')
+            
+        self.btn_do = tk.Button(self.contentframe, text='Launch', command=self.do_something)
+        self.btn_cancel = tk.Button(self.contentframe, text='Cancel', command=self.close_win)
+
+
+        self.btn_do.grid(row=len(self.labels), column=0, sticky='e')
+        self.btn_cancel.grid(row=len(self.labels), column=1, sticky='e')
+        
+        #
+
+        # Padding
+        for child in self.parent.winfo_children():
+            child.grid_configure(padx=10, pady=5)
+        for child in self.contentframe.winfo_children():
+            child.grid_configure(padx=5, pady=2)
+    
+    def do_something(self):
+        self.close_win()
+
+class ReferenceList(PopUp):
+    
+    def init_gui(self):
+        self.parent.title("Reference List")
+        self.parent.columnconfigure(0, weight=1)
+        self.parent.rowconfigure(3, weight=1)
+        self.x = 3
+        # Create Widgets
+        self.contentframe = ttk.Frame(self.parent, relief="sunken")
+        self.top = ttk.Frame(self.contentframe)
+        self.bot = ttk.Frame(self.contentframe)
+        
+        self.contentframe.pack()
+        self.top.pack()
+        self.bot.pack()
+        
+        self.labels = [
+            tk.Label(self.top, text="Reference List: "),
+        ]
+        
+        self.inputs = [
+            tk.Entry(self.top)
+        ]
+        
+        self.labels[0].grid(row=0, column=0, sticky='w')      
+        self.inputs[0].grid(row=0, column=1, sticky='we')
+
+        tk.Label(self.bot, text="Value: ").grid(row=0, column=0)        
+        tk.Label(self.bot, text="Text Description").grid(row=0, column=1)   
+        
+        tk.Entry(self.bot).grid(row=1, column=1)        
+        tk.Entry(self.bot).grid(row=1, column=0)
+        
+        tk.Button(self.bot, text='add', command=self.add).grid(row=10, column=1, sticky='e')
+    
+    
+    def add(self):
+        tk.Entry(self.bot).grid(row=self.x, column=0) 
+        tk.Entry(self.bot).grid(row=self.x, column=1) 
+        self.x+=1
+        
+    def do_something(self):
+        self.close_win()
+        
+class PacketInfo(PopUp):
+    
+    def init_gui(self):
+        self.parent.title("Packet Information")
+        self.parent.columnconfigure(0, weight=1)
+        self.parent.rowconfigure(3, weight=1)
+        self.x = 3
+        # Create Widgets
+        self.contentframe = ttk.Frame(self.parent, relief="sunken")
+        self.top = ttk.Frame(self.contentframe)
+        self.bot = ttk.Frame(self.contentframe)
+        
+        self.contentframe.pack()
+        self.top.pack()
+        self.bot.pack()
+
+        tk.Label(self.bot, text="Value: ").grid(row=0, column=0)        
+        tk.Label(self.bot, text="Text Description").grid(row=0, column=1)   
+        
+        tk.Entry(self.bot).grid(row=1, column=1)        
+        tk.Entry(self.bot).grid(row=1, column=0)
+        
+        tk.Button(self.bot, text='add', command=self.add).grid(row=10, column=1, sticky='e')
+        
+    
+    def add(self):
+        tk.Entry(self.bot).grid(row=self.x, column=0) 
+        tk.Entry(self.bot).grid(row=self.x, column=1) 
+        self.x+=1
+        
+    def do_something(self):
+        self.close_win()
+

@@ -1,19 +1,24 @@
 import Tkinter as tk
-import abc
+
 import ttk
 import tkFileDialog
 import  os
 from CustomWidgets import EntryWithPlaceholder 
+from CustomWidgets import RoundedButton
+from CustomWidgets import HeaderFrame
+from CustomWidgets import PopUp
 
 class Menubar(tk.Frame):
     """Builds a menu bar for the top of the main window"""
-    def __init__(self, parent, path, project_explorer):
+    def __init__(self, parent, path, project_explorer, building_area):
         ''' Constructor'''
-        tk.Frame.__init__(self, parent)
+        tk.Frame.__init__(self, parent, bg='white')
         self.path = path
         self.project_explorer = project_explorer
+        self.building_area = building_area        
         self.root = parent
         self.init_menubar()
+        
     
     def new_project(self):
         self.new_proj_win = tk.Toplevel(self.root) # Set parent
@@ -41,62 +46,36 @@ class Menubar(tk.Frame):
         
     def rebuild_tree(self, path):
         self.project_explorer.rebuild_tree(path)
+        
+    def show_proj_exp(self):
+        print(type(self.project_explorer))
+        self.project_explorer.show_exp()
+    
+    def show_draw(self):
+        print(type(self.project_explorer))
+        self.building_area.show_build()
 
     def init_menubar(self):
-        self.label_title = tk.Label(self, text="Protocol Dissector Generator System", font=("Helvetica", 18, 'bold'))
-        self.label_title.grid(row=0, column=0, columnspan=10)
+        self.label_title = tk.Label(self, text="Protocol Dissector Generator System", font=("Helvetica", 18, 'bold'), bg='white', pady=10)
+        self.label_title.configure(foreground="#ff6600")
+        self.label_title.grid(row=0, column=0, columnspan=10, sticky='w')
         
         # Create Widgets
-        self.btns = [tk.Button(self, text='Create Project', command=self.new_project),
-                     tk.Button(self, text='Save Project'),
-                     tk.Button(self, text='Close Project'),
-                     tk.Button(self, text='Switch Workspace'),
-                     tk.Button(self, text='Import Project', command=self.proj_import),
-                     tk.Button(self, text='Export Project', command=self.proj_export),
-                     tk.Button(self, text='Generate Dissector Script', command=self.generate_dissector),
-                     tk.Button(self, text='Organize Views', command=self.org_views),
-                     tk.Button(self, text='Open PCAP', command=self.open_pcap)]                   
+        self.btns = [
+                     tk.Button(self, text='Create Project', pady=10, command=self.new_project),              
+                     tk.Button(self, text='Save Project', pady=10),
+                     tk.Button(self, text='Close Project', pady=10),
+                     tk.Button(self, text='Switch Workspace', pady=10),
+                     tk.Button(self, text='Import Project', pady=10, command=self.proj_import),
+                     tk.Button(self, text='Export Project', pady=10, command=self.proj_export),
+                     tk.Button(self, padx=100, text='Generate Dissector Script', pady=10, command=self.generate_dissector),
+                     tk.Button(self, text='Organize Views', pady=10, command=self.org_views),
+                     tk.Button(self, text='Open PCAP', pady=10, command=self.open_pcap)]                   
        
         for i in range(len(self.btns)):
             self.btns[i].grid(row=1, column=i, padx=10, pady=10)
             self.btns[i].config(width=15)
 
-            
-class PopUp(object, tk.Frame):
-    """Abstract base class for a popup window"""
-    __metaclass__ = abc.ABCMeta
-    def __init__(self, parent, root):
-        ''' Constructor '''
-        tk.Frame.__init__(self, parent)
-        self.parent = parent
-        self.root = root
-        self.parent.resizable(width=False, height=False) # Disallows window resizing
-        self.validate_notempty = (self.register(self.notEmpty), '%P') # Creates Tcl wrapper for python function. %P = new contents of field after the edit.
-        self.init_gui()
-
-    @abc.abstractmethod # Must be overwriten by subclasses
-    def init_gui(self):
-        '''Initiates GUI of any popup window'''
-        pass
-
-    @abc.abstractmethod
-    def do_something(self):
-        '''Does something that all popup windows need to do'''
-        pass
-
-    def notEmpty(self, P):
-        '''Validates Entry fields to ensure they aren't empty'''
-        if P.strip():
-            valid = True
-        else:
-            print("Error: Field must not be empty.") # Prints to console
-            valid = False
-        return valid
-
-    def close_win(self):
-        '''Closes window'''
-        self.parent.destroy()
-        
 class WorkspaceLauncher(PopUp):
     """ New popup window """
 
@@ -473,14 +452,21 @@ class OrganizeViews(PopUp):
             child.grid_configure(padx=5, pady=2)
     
     def do_something(self):
-        print(str(self.proj_flag.get()))
-        print(str(self.diss_flag.get()))
-        print(str(self.palette_flag.get()))
-        print(str(self.packet_flag.get()))
-        print(str(self.disse_flag.get()))
-        print(str(self.raw_flag.get()))
-        print(str(self.console_flag.get()))
-        self.close_win()
+        if OrganizeViews.proj_flag.get():
+            self.root.show_proj_exp()
+        
+        if OrganizeViews.diss_flag.get():    
+            self.root.show_draw()
+            
+#==============================================================================
+#         if self.diss_flag.get():
+#         if self.palette_flag.get():
+#         if self.packet_flag.get():
+#         if self.disse_flag.get():
+#         if self.raw_flag.get():
+#         if self.console_flag.get():
+#==============================================================================
+    
 
 class OpenPCAP(PopUp):
     """ New popup window """
