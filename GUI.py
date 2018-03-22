@@ -33,8 +33,9 @@ class GUI(tk.Frame):
         self.root.geometry(str(self.screen_width)+"x"+str(self.screen_height))#"1200x800")
         
         self.project_explorer = ProjectExplorer(self.root, workspace_path, 'Project Explorer')
-        self.menubar = Menubar(self.root, workspace_path, self.project_explorer, self.building_area)
         self.building_area = BuildingArea(self.root, 'Dissector Builder Area')
+        self.menubar = Menubar(self.root, workspace_path, self.project_explorer, self.building_area)
+        
         self.tabs = Tabs(self.root)
         
         self.menubar.grid(row=0, column=0, rowspan=1, columnspan=10, sticky=(tk.N, tk.S, tk.W, tk.E))
