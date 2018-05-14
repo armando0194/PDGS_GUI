@@ -6,6 +6,9 @@ from CustomWidgets import CircularButton
 from CustomWidgets import PopUp
 from CustomWidgets import HeaderFrame
 from Menu import OrganizeViews
+from Tkinter import Scrollbar
+
+
 
 def dnd_start(source, event):
     h = DndHandler(source, event)
@@ -161,8 +164,18 @@ class DrawArea(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self, root, bg='white')
         self.canvas = tk.Canvas(self)
-        self.canvas.pack(fill="both", expand=1)
+        #self.canvas.pack(fill="both", expand=1)
         self.canvas.dnd_accept = self.dnd_accept
+
+        self.hbar = Scrollbar(self.canvas, orient=tk.HORIZONTAL)
+        self.hbar.pack(side=tk.BOTTOM,fill=tk.X)
+        self.hbar.config(command=self.canvas.xview)
+        self.vbar=Scrollbar(self.canvas, orient=tk.VERTICAL)
+        self.vbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.vbar.config(command=self.canvas.yview)
+        self.canvas.config(width=5000, height=5000)
+        self.canvas.config(xscrollcommand=self.hbar.set, yscrollcommand=self.vbar.set)
+        self.canvas.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
  
     def dnd_accept(self, source, event):
         return self
@@ -199,11 +212,13 @@ class DrawArea(tk.Frame):
         
 class Icon:
  
-    def __init__(self, name, shape='rect', command=None):
+    def __init__(self, name, shape='rect', command=None, ba=None, is_copy=False):
         self.name = name
         self.shape = shape
         self.canvas = self.label = self.id = None
         self.command = command
+        self.ba = ba
+        self.is_copy = is_copy
  
     def attach(self, canvas, x=10, y=10):
         if canvas is self.canvas:
@@ -213,7 +228,22 @@ class Icon:
             self.detach()
         if not canvas:
             return zxx
-        if 'rect' in self.shape :
+        
+        if self.label is not None:
+            self.label.destroy()
+
+        if 'S' in self.name and self.is_copy:
+            label = StartField(canvas, self.ba, 'Start')
+        elif 'Field' in self.name and self.is_copy:
+            label = Variable(canvas, self.ba, 'Field')
+        elif 'Reference List' in self.name and self.is_copy:
+            label = ReferenceList(canvas, self.ba, 'Reference List')
+        elif 'E' in self.name and self.is_copy:
+            label = HeaderFrame(canvas, 'End')
+        elif 'Packet Info' in self.name and self.is_copy:
+            label = PacketInfo(canvas, self.ba, 'Packet')
+
+        elif 'rect' in self.shape :
             label = tk.Label(canvas, text=self.name,
                                   borderwidth=2, relief="raised", padx=10, pady=10)    
         elif 'circular' in self.shape :
@@ -228,7 +258,11 @@ class Icon:
         self.canvas = canvas
         self.label = label
         self.id = id
-        label.bind("<ButtonPress>", self.press)
+        if not self.is_copy:
+            label.bind("<ButtonPress>", self.press)
+        if self.is_copy:
+            label.bind("<ButtonPress>", self.press_copy)
+ 
  
     def detach(self):
         canvas = self.canvas
@@ -247,8 +281,18 @@ class Icon:
             self.y_off = event.y
             # where the widget is relative to the canvas:
             self.x_orig, self.y_orig = self.canvas.coords(self.id)
-            copy = Icon(self.name, self.shape, command=self.command)
+            copy = Icon(self.name, self.shape, command=self.command, ba=self.ba)
             copy.attach(self.canvas, self.x_orig, self.y_orig)
+            self.is_copy = True
+    
+    def press_copy(self, event):
+        if dnd_start(self, event):
+            # where the pointer is relative to the label widget:
+            self.x_off = event.x
+            self.y_off = event.y
+            # where the widget is relative to the canvas:
+            self.x_orig, self.y_orig = self.canvas.coords(self.id)
+            self.attach(self.canvas, self.x_orig, self.y_orig)
  
     def move(self, event):
         x, y = self.where(self.canvas, event)
@@ -313,8 +357,6 @@ class DndFrame(tk.Frame):
         source.attach(self.canvas, x, y)
         
 class BuildingArea(HeaderFrame):
-    '''Illustrate how to drag items on a Tkinter canvas'''
-
     def __init__(self, parent, text):
         HeaderFrame.__init__(self, parent, text)
         self.root = parent
@@ -344,41 +386,35 @@ class BuildingArea(HeaderFrame):
 
     def init_fields(self):
         self.icons = [
-                        Icon("S", shape='circular', command=self.start_field_popup),
-                        Icon("Field (2 Byte)", command=self.var_popup),
-                        Icon("Field (8 Byte)",command=self.var_popup),
-                        Icon("Field (8 Byte)",command=self.var_popup),
-                        Icon("Field (Var size)",command=self.var_popup),
-                        Icon("Reference List", command=self.ref_popup),
-                        Icon("Field (1 Byte)",command=self.var_popup),
-                        Icon("Field (4 Byte)",command=self.var_popup),
-                        Icon("Field (16 Byte)", command=self.var_popup),
-                        Icon("Field (16 Byte)", command=self.var_popup),
-                        Icon("E", shape='circular'),
-                        Icon("Packet Info.", command=self.pack_popup)   
+                        Icon("S", shape='circular', command=self.start_field_popup, ba=self),
+                        Icon("Field (Var size)", command=self.var_popup, ba=self),
+                        Icon("Reference List", command=self.ref_popup, ba=self),
+                        Icon("E", shape='circular', ba=self),
+                        Icon("Packet Info.", command=self.pack_popup, ba=self)   
                      ]
                
-        for i in range(6):        
+        for i in range(2):        
             y = i*80+30
             self.icons[i].attach(self.fields.canvas, y=y)  
-            self.icons[i+6].attach(self.fields.canvas, x=350, y=y)
+            self.icons[i+3].attach(self.fields.canvas, x=350, y=y)
+        
+        y = 3*80+30
+        self.icons[2].attach(self.fields.canvas, y=y)
+       
     
     def var_popup(self):
-        print('hola')
-        self.var_win = tk.Toplevel(self.root) # Set parent
-        Variable(self.var_win, self)
+        pass
                 
     def start_field_popup(self):
-        self.start_win = tk.Toplevel(self.root) # Set parent
-        StartField(self.start_win, self)
-    
+        #self.start_win = tk.Toplevel(self.root) # Set parent
+        #StartField(self.start_win, self)
+        pass
+
     def ref_popup(self):
-        self.ref_win = tk.Toplevel(self.root) # Set parent
-        ReferenceList(self.ref_win, self)
+        pass
     
     def pack_popup(self):
-        self.pack_win = tk.Toplevel(self.root) # Set parent
-        PacketInfo(self.pack_win, self)        
+        pass     
         
         
     def init_constructs(self):
@@ -441,151 +477,133 @@ class BuildingArea(HeaderFrame):
     def show_build(self):
         self.grid(row=1, column=2, rowspan=15, columnspan=8, sticky=(tk.N, tk.S, tk.W, tk.E))
 
-class Variable(PopUp):
+class Variable(HeaderFrame):
     """ New popup window """
     REF_OPTIONS = ["List 1", 'List 2']
     BASE_OPTIONS = ["64", '8', '2']
     DATA_TYPE_OPTIONS = ["Int", 'Str', 'Double']
     
-    def init_gui(self):
-        self.parent.title("Field")
-        self.parent.columnconfigure(0, weight=1)
-        self.parent.rowconfigure(3, weight=1)
+    def __init__(self, parent, root, text):
+        ''' Constructor '''
+        HeaderFrame.__init__(self, parent, text)
+        self.parent = parent
+        self.root = root
+        self.init_gui()
 
-        # Create Widgets
-        self.contentframe = ttk.Frame(self.parent, relief="sunken")
-        
+    def init_gui(self):
         self.labels = [
-            tk.Label(self.contentframe, text="Name: "),
-            tk.Label(self.contentframe, text="Abbreviation: "),
-            tk.Label(self.contentframe, text="Description: "),
-            tk.Label(self.contentframe, text="Reference List: "),
-            tk.Label(self.contentframe, text="Data Type: "),
-            tk.Label(self.contentframe, text="Base: "),
-            tk.Label(self.contentframe, text="Mask: "),
-            tk.Label(self.contentframe, text="Value Constraints: "),
-            tk.Label(self.contentframe, text="Required: ")
+            tk.Label(self.sub_frame, text="Name: "),
+            tk.Label(self.sub_frame, text="Abbreviation: "),
+            tk.Label(self.sub_frame, text="Description: "),
+            tk.Label(self.sub_frame, text="Reference List: "),
+            tk.Label(self.sub_frame, text="Data Type: "),
+            tk.Label(self.sub_frame, text="Base: "),
+            tk.Label(self.sub_frame, text="Mask: "),
+            tk.Label(self.sub_frame, text="Value Constraints: "),
+            tk.Label(self.sub_frame, text="Required: ")
         ]
         
         
-        self.ref = tk.StringVar(self.contentframe)
+        self.ref = tk.StringVar(self.sub_frame)
         self.ref.set(self.REF_OPTIONS[0]) # default value
         
-        self.base = tk.StringVar(self.contentframe)
+        self.base = tk.StringVar(self.sub_frame)
         self.base.set(self.BASE_OPTIONS[0]) # default value
         
-        self.data = tk.StringVar(self.contentframe)
+        self.data = tk.StringVar(self.sub_frame)
         self.data.set(self.DATA_TYPE_OPTIONS[0]) # default value
         
         self.inputs = [
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe),
-            tk.OptionMenu(self.contentframe, self.ref, *self.REF_OPTIONS),
-            tk.OptionMenu(self.contentframe, self.base, *self.BASE_OPTIONS),
-            tk.OptionMenu(self.contentframe, self.data, *self.DATA_TYPE_OPTIONS),
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe),
-            tk.Checkbutton(self.contentframe)
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame),
+            tk.OptionMenu(self.sub_frame, self.ref, *self.REF_OPTIONS),
+            tk.OptionMenu(self.sub_frame, self.base, *self.BASE_OPTIONS),
+            tk.OptionMenu(self.sub_frame, self.data, *self.DATA_TYPE_OPTIONS),
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame),
+            tk.Checkbutton(self.sub_frame)
         ]
         
         for i in range(len(self.labels)):
             self.labels[i].grid(row=i, column=0)
         for i in range(len(self.labels)):
             self.inputs[i].grid(row=i, column=1, sticky='ew')
-            
-        self.btn_do = tk.Button(self.contentframe, text='Launch', command=self.do_something)
-        self.btn_cancel = tk.Button(self.contentframe, text='Cancel', command=self.close_win)
-
-
-        self.btn_do.grid(row=len(self.labels), column=0, sticky='e')
-        self.btn_cancel.grid(row=len(self.labels), column=1, sticky='e')
-        
-        #
 
         # Padding
-        for child in self.parent.winfo_children():
+        for child in self.sub_frame.winfo_children():
             child.grid_configure(padx=10, pady=5)
-        for child in self.contentframe.winfo_children():
-            child.grid_configure(padx=5, pady=2)
+
     
     def do_something(self):
         self.close_win()
 
-class StartField(PopUp):
+class StartField(HeaderFrame):
     """ New popup window """
     REF_OPTIONS = ["List 1", 'List 2']
     BASE_OPTIONS = ["64", '8', '2']
     DATA_TYPE_OPTIONS = ["Int", 'Str', 'Double']
     
-    def init_gui(self):
-        self.parent.title("Start Field")
-        self.parent.columnconfigure(0, weight=1)
-        self.parent.rowconfigure(3, weight=1)
+    def __init__(self, parent, root, text):
+        ''' Constructor '''
+        HeaderFrame.__init__(self, parent, text)
+        self.parent = parent
+        self.root = root
+        self.init_gui()
 
+    def init_gui(self):
         # Create Widgets
-        self.contentframe = ttk.Frame(self.parent, relief="sunken")
         
         self.labels = [
-            tk.Label(self.contentframe, text="Protocol Name: "),
-            tk.Label(self.contentframe, text="Protocol Description: "),
-            tk.Label(self.contentframe, text="Dependent Protocol Name: "),
-            tk.Label(self.contentframe, text="Dependency Pattern: "),
+            tk.Label(self.sub_frame, text="Protocol Name: "),
+            tk.Label(self.sub_frame, text="Protocol Description: "),
+            tk.Label(self.sub_frame, text="Dependent Protocol Name: "),
+            tk.Label(self.sub_frame, text="Dependency Pattern: "),
         ]
         
-        
-        self.ref = tk.StringVar(self.contentframe)
+        self.ref = tk.StringVar(self.sub_frame)
         self.ref.set(self.REF_OPTIONS[0]) # default value
         
-        self.base = tk.StringVar(self.contentframe)
+        self.base = tk.StringVar(self.sub_frame)
         self.base.set(self.BASE_OPTIONS[0]) # default value
         
-        self.data = tk.StringVar(self.contentframe)
+        self.data = tk.StringVar(self.sub_frame)
         self.data.set(self.DATA_TYPE_OPTIONS[0]) # default value
         
         self.inputs = [
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe),
-            tk.Entry(self.contentframe)
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame),
+            tk.Entry(self.sub_frame)
         ]
         
         for i in range(len(self.labels)):
             self.labels[i].grid(row=i, column=0)
         for i in range(len(self.labels)):
             self.inputs[i].grid(row=i, column=1, sticky='ew')
-            
-        self.btn_do = tk.Button(self.contentframe, text='Launch', command=self.do_something)
-        self.btn_cancel = tk.Button(self.contentframe, text='Cancel', command=self.close_win)
-
-
-        self.btn_do.grid(row=len(self.labels), column=0, sticky='e')
-        self.btn_cancel.grid(row=len(self.labels), column=1, sticky='e')
-        
-        #
 
         # Padding
-        for child in self.parent.winfo_children():
-            child.grid_configure(padx=10, pady=5)
-        for child in self.contentframe.winfo_children():
+        for child in self.sub_frame.winfo_children():
             child.grid_configure(padx=5, pady=2)
     
     def do_something(self):
         self.close_win()
 
-class ReferenceList(PopUp):
+class ReferenceList(HeaderFrame):
     
+    def __init__(self, parent, root, text):
+        ''' Constructor '''
+        HeaderFrame.__init__(self, parent, text)
+        self.parent = parent
+        self.root = root
+        self.init_gui()
+
     def init_gui(self):
-        self.parent.title("Reference List")
-        self.parent.columnconfigure(0, weight=1)
-        self.parent.rowconfigure(3, weight=1)
         self.x = 3
         # Create Widgets
-        self.contentframe = ttk.Frame(self.parent, relief="sunken")
-        self.top = ttk.Frame(self.contentframe)
-        self.bot = ttk.Frame(self.contentframe)
+        self.top = ttk.Frame(self.sub_frame)
+        self.bot = ttk.Frame(self.sub_frame)
         
-        self.contentframe.pack()
         self.top.pack()
         self.bot.pack()
         
@@ -617,19 +635,21 @@ class ReferenceList(PopUp):
     def do_something(self):
         self.close_win()
         
-class PacketInfo(PopUp):
-    
+class PacketInfo(HeaderFrame):
+    def __init__(self, parent, root, text):
+        ''' Constructor '''
+        HeaderFrame.__init__(self, parent, text)
+        self.parent = parent
+        self.root = root
+        self.init_gui()
+
     def init_gui(self):
-        self.parent.title("Packet Information")
-        self.parent.columnconfigure(0, weight=1)
-        self.parent.rowconfigure(3, weight=1)
+
         self.x = 3
         # Create Widgets
-        self.contentframe = ttk.Frame(self.parent, relief="sunken")
-        self.top = ttk.Frame(self.contentframe)
-        self.bot = ttk.Frame(self.contentframe)
+        self.top = ttk.Frame(self.sub_frame)
+        self.bot = ttk.Frame(self.sub_frame)
         
-        self.contentframe.pack()
         self.top.pack()
         self.bot.pack()
 

@@ -1,4 +1,5 @@
 import Tkinter as tk
+from Tkinter import Scrollbar
 
 # Lots of tutorials have from tkinter import *, but that is pretty much always a bad idea
 import ttk
