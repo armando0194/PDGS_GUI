@@ -1,21 +1,27 @@
+# encoding=utf8
 import Tkinter as tk
 
 import ttk
+import subprocess
 import tkFileDialog
 import  os
+from project import Project
 from CustomWidgets import EntryWithPlaceholder 
 from CustomWidgets import RoundedButton
 from CustomWidgets import HeaderFrame
 from CustomWidgets import PopUp
 
 class Menubar(tk.Frame):
+
     """Builds a menu bar for the top of the main window"""
-    def __init__(self, parent, path, project_explorer, building_area):
+    def __init__(self, parent, path, project_explorer, building_area, tabs):
         ''' Constructor'''
         tk.Frame.__init__(self, parent, bg='white')
         self.path = path
+        self.project = Project(path)
         self.project_explorer = project_explorer
-        self.building_area = building_area        
+        self.building_area = building_area  
+        self.tabs = tabs      
         self.root = parent
         self.init_menubar()
         
@@ -26,7 +32,7 @@ class Menubar(tk.Frame):
     
     def generate_dissector(self):
         self.gen_diss_win = tk.Toplevel(self.root) # Set parent
-        DissectorGenerator(self.gen_diss_win, self)
+        DissectorGenerator(self.gen_diss_win, self, self.project)
         
     def proj_import(self):
         self.proj_import_win = tk.Toplevel(self.root) # Set parent
@@ -54,6 +60,14 @@ class Menubar(tk.Frame):
     def show_draw(self):
         print(type(self.project_explorer))
         self.building_area.show_build()
+    
+    def apply_dis(self):
+        cmd = "tshark -Xluascript -r /home/armando/Documents/PDGS_GUI/Workspace/ICMP/icmp.lua -r /home/armando/Documents/PDGS_GUI/icmp.pcap -T pdml"
+        out = subprocess.check_output(cmd, shell=True) 
+        text_file = open('/home/armando/Documents/PDGS_GUI/Workspace/ICMP/pdml.xml', "w+")
+        text_file.write(out)
+        text_file.close()
+
 
     def init_menubar(self):
         self.label_title = tk.Label(self, text="Protocol Dissector Generator System", font=("Helvetica", 18, 'bold'), bg='white', pady=10)
@@ -63,18 +77,25 @@ class Menubar(tk.Frame):
         # Create Widgets
         self.btns = [
                      tk.Button(self, text='Create Project', pady=10, command=self.new_project),              
-                     tk.Button(self, text='Save Project', pady=10),
+                     tk.Button(self, text='Save Project', pady=10, command=self.save),
                      tk.Button(self, text='Close Project', pady=10),
                      tk.Button(self, text='Switch Workspace', pady=10),
                      tk.Button(self, text='Import Project', pady=10, command=self.proj_import),
                      tk.Button(self, text='Export Project', pady=10, command=self.proj_export),
                      tk.Button(self, padx=100, text='Generate Dissector Script', pady=10, command=self.generate_dissector),
                      tk.Button(self, text='Organize Views', pady=10, command=self.org_views),
-                     tk.Button(self, text='Open PCAP', pady=10, command=self.open_pcap)]                   
+                     tk.Button(self, text='Open PCAP', pady=10, command=self.open_pcap),
+                     tk.Button(self, text='Apply', pady=10, command=self.apply_dis)]                   
        
         for i in range(len(self.btns)):
             self.btns[i].grid(row=1, column=i, padx=10, pady=10)
             self.btns[i].config(width=15)
+    
+    def save(self):
+        self.project.save()
+
+
+
 
 class WorkspaceLauncher(PopUp):
     """ New popup window """
@@ -241,6 +262,7 @@ class DissectorGenerator(PopUp):
             child.grid_configure(padx=5, pady=2)
     
     def do_something(self):
+        self.project.save_lua()
         self.close_win()
         
     def browse_proj(self):
@@ -304,10 +326,11 @@ class ProjectImport(PopUp):
 class ProjectExport(PopUp):
     """ New popup window """
     
-    def init_gui(self):
+    def init_gui(self, project):
         self.parent.title("Project Export")
         self.parent.columnconfigure(0, weight=1)
         self.parent.rowconfigure(3, weight=1)
+        self.project = project
 
         # Create Widgets
         self.label_title = tk.Label(self.parent, text="Export a project to the local system.")
@@ -513,6 +536,15 @@ class OpenPCAP(PopUp):
     def do_something(self):
         self.folder_path = self.path_entry.get()
         if self.folder_path:
+            cmd = "tshark -x -r {}|sed -n 's/^[0-9a-f][0-9a-f]*  \(.*  \) .*/\\1/p'".format(self.folder_path)
+            out = subprocess.check_output(cmd, shell=True)
+
+            cmd2 = "tshark -r icmp.pcap -i 1 -n -e frame.number -e frame.time_relative -e ip.src -e ip.dst -e frame.len -T fields"
+            out2 = subprocess.check_output(cmd2, shell=True)
+
+            self.root.tabs.fill_raw_data(out)
+            self.root.tabs.fill_packet_stream(out2)
+
             self.close_win()
         else:
             print("Error: But for real though, field must not be empty.")

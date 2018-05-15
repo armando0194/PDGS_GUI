@@ -17,7 +17,7 @@ class GUI(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.root = parent
-        self.root.option_add('*font', ('verdana', 12, 'bold'))
+        self.root.option_add('*font', ('Times', 25, 'bold'))
         self.openwindow()
 
     def openwindow(self):
@@ -35,10 +35,10 @@ class GUI(tk.Frame):
         
         self.project_explorer = ProjectExplorer(self.root, workspace_path, 'Project Explorer')
         self.building_area = BuildingArea(self.root, 'Dissector Builder Area')
-        self.menubar = Menubar(self.root, workspace_path, self.project_explorer, self.building_area)
-        
         self.tabs = Tabs(self.root)
+        self.menubar = Menubar(self.root, workspace_path, self.project_explorer, self.building_area, self.tabs)
         
+       
         self.menubar.grid(row=0, column=0, rowspan=1, columnspan=10, sticky=(tk.N, tk.S, tk.W, tk.E))
         self.project_explorer.grid(row=1, column=0, rowspan=15, columnspan=2, sticky=(tk.N, tk.S, tk.W, tk.E))
         self.building_area.grid(row=1, column=2, rowspan=15, columnspan=8, sticky=(tk.N, tk.S, tk.W, tk.E))
@@ -166,90 +166,52 @@ class Tabs(tk.Frame):
         self.nb.add(self.console, text='Console') 
         
     def init_raw_data(self):
-        self.raw_tab = tk.Frame(self.nb)
-        
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=0, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=1, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=2, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=3, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=4, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=5, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=6, column=0)
-        tk.Label(self.raw_tab, text="f6 a3 3d cb f7 64 9c b6  d0 d6 5f 77 08 00 45 00   ...=..d.. .._w..E").grid(row=7, column=0)
-                                          
-        self.nb.add(self.raw_tab, text='Raw Data Area')         
+        self.raw_tab = tk.Frame(self.nb)                         
+        self.nb.add(self.raw_tab, text='Raw Data Area')  
+    
+    def fill_raw_data(self, hex_data):
+        print hex_data   
+        hex_data = hex_data.split('\n')
+        for i in range(5):
+            tk.Label(self.raw_tab, text=hex_data[i]).grid(row=i, column=0)
+          
         
     def init_packet_stream(self):
         self.packet_tab = tk.Frame(self.nb)
         self.nb.add(self.packet_tab, text='Packet Stream Area') 
         
-        labels = [
+        self.labels_ps = [
                     tk.Label(self.packet_tab, text='No', anchor='w', padx=10),
                     tk.Label(self.packet_tab, text='Time', anchor='w', padx=10),
                     tk.Label(self.packet_tab, text='Source', anchor='w', padx=10),
                     tk.Label(self.packet_tab, text='Destination', anchor='w', padx=10),
-                    tk.Label(self.packet_tab, text='Protocol', anchor='w', padx=10),
-                    tk.Label(self.packet_tab, text='Info', anchor='w', padx=10),
-
-                    tk.Label(self.packet_tab, text='366', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='lightgreen'),
+                    tk.Label(self.packet_tab, text='Len', anchor='w', padx=10)
+                ]
                     
-                    tk.Label(self.packet_tab, text='367', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='lightgreen'),
-                    
-                    tk.Label(self.packet_tab, text='368', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='lightgreen'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='lightgreen'),
-                    
-                    tk.Label(self.packet_tab, text='369', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='#ff8772'),
-                    
-                    tk.Label(self.packet_tab, text='370', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='#ff8772'),
-
-                    tk.Label(self.packet_tab, text='371', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='11.767290', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='192.168.0.31', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='TSLv 1.2', anchor='w', padx=10, bg='#ff8772'),
-                    tk.Label(self.packet_tab, text='631 -> 60224 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1386 WS=32 TSval=1000097195 TSecr=3959397636 SACK_PERM=1', anchor='w', padx=10, bg='#ff8772'),
-        ]
-                    
-        for i in range(0, 6):
-            labels[i].grid(row=0, column=i)
-            labels[i+6].grid(row=1, column=i)
-            labels[i+(6*2)].grid(row=2, column=i)
-            labels[i+(6*3)].grid(row=3, column=i)
-            labels[i+6*4].grid(row=4, column=i)
-            labels[i+(6*5)].grid(row=5, column=i)
-            labels[i+(6*6)].grid(row=6, column=i)
-        
-#==============================================================================
-#         for r in range(6):
-#             self.rowconfigure(r, weight=1)
-#         for c in range(6):
-#             self.columnconfigure(c, weight=1)
-#==============================================================================
-        
+        for i in range(0, 5):
+            self.labels_ps[i].grid(row=0, column=i)
+  
+    
+    def fill_packet_stream(self, data):
+        data = data.replace('\n', '\t')
+        data = data.split('\t')
+       
+        data = to_matrix(data, 5)
+        print(data)
+        for i in range(len(data)-1):
+            for j in range(5):
+                self.labels_ps.append( tk.Label(self.packet_tab, text=data[i][j], anchor='w', padx=10, bg='lightgreen'))
+                
+        for i in range(1, 5):
+            self.labels_ps[i].grid(row=0, column=i)
+            self.labels_ps[i+5].grid(row=1, column=i)
+            self.labels_ps[i+(5*2)].grid(row=2, column=i)
+            self.labels_ps[i+(5*3)].grid(row=3, column=i)
+            self.labels_ps[i+5*4].grid(row=4, column=i)
+            self.labels_ps[i+(5*5)].grid(row=5, column=i)   
+          
+def to_matrix(l, n):
+    return [l[i:i+n] for i in xrange(0, len(l), n)]
 
 if __name__ == '__main__':
     root = tk.Tk()

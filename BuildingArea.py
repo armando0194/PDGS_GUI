@@ -176,7 +176,19 @@ class DrawArea(tk.Frame):
         self.canvas.config(width=5000, height=5000)
         self.canvas.config(xscrollcommand=self.hbar.set, yscrollcommand=self.vbar.set)
         self.canvas.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
- 
+
+        self.canvas.bind('<ButtonPress-1>', self.draw_line)
+        self.canvas.bind('<ButtonRelease-1>', self.draw_line)
+    
+    def draw_line(self, event):
+        if str(event.type) in '4':
+            self.canvas.old_coords = event.x, event.y
+
+        elif str(event.type) in '5':
+            x, y = event.x, event.y
+            x1, y1 = self.canvas.old_coords
+            self.canvas.create_line(x, y, x1, y1, arrow="first")
+
     def dnd_accept(self, source, event):
         return self
  
@@ -219,6 +231,7 @@ class Icon:
         self.command = command
         self.ba = ba
         self.is_copy = is_copy
+        self.arrow = False
  
     def attach(self, canvas, x=10, y=10):
         if canvas is self.canvas:
@@ -252,6 +265,7 @@ class Icon:
             label = RhombusButton(canvas, 300, 150, 'grey')
         else:
             label = ArrowButton(canvas, 200, 150, 'black')
+            self.arrow = True
             
         id = canvas.create_window(x, y, window=label, anchor="nw") 
            
@@ -479,9 +493,9 @@ class BuildingArea(HeaderFrame):
 
 class Variable(HeaderFrame):
     """ New popup window """
-    REF_OPTIONS = ["List 1", 'List 2']
-    BASE_OPTIONS = ["64", '8', '2']
-    DATA_TYPE_OPTIONS = ["Int", 'Str', 'Double']
+    REF_OPTIONS = ["None","List 1", 'List 2']
+    BASE_OPTIONS = ['base.NONE', 'base.DEC', 'base.HEX', 'base.OCT', 'base.DEC_HEX', 'base.HEX_DEC' , 'base.UNIT_STRING' ]
+    DATA_TYPE_OPTIONS = ['ftypes.BOOLEAN', 'ftypes.UINT8', 'ftypes.UINT16', 'ftypes.UINT24', 'ftypes.UINT32', 'ftypes.UINT64', 'ftypes.INT8', 'ftypes.INT16', 'ftypes.INT24', 'ftypes.INT32', 'ftypes.INT64', 'ftypes.FLOAT', 'ftypes.DOUBLE', 'ftypes.ABSOLUTE_TIME', 'ftypes.RELATIVE_TIME', 'ftypes.STRING', 'ftypes.STRINGZ', 'ftypes.UINT_STRING', 'ftypes.ETHER', 'ftypes.BYTES', 'ftypes.UINT_BYTES', 'ftypes.IPv4', 'ftypes.IPv6', 'ftypes.IPXNET', 'ftypes.FRAMENUM', 'ftypes.PCRE', 'ftypes.GUID', 'ftypes.OID', 'ftypes.PROTOCOL', 'ftypes.REL_OID', 'ftypes.SYSTEM_ID', 'ftypes.EUI64', 'ftypes.NONE']
     
     def __init__(self, parent, root, text):
         ''' Constructor '''
@@ -500,6 +514,7 @@ class Variable(HeaderFrame):
             tk.Label(self.sub_frame, text="Base: "),
             tk.Label(self.sub_frame, text="Mask: "),
             tk.Label(self.sub_frame, text="Value Constraints: "),
+            tk.Label(self.sub_frame, text="Size: "),
             tk.Label(self.sub_frame, text="Required: ")
         ]
         
@@ -520,6 +535,7 @@ class Variable(HeaderFrame):
             tk.OptionMenu(self.sub_frame, self.ref, *self.REF_OPTIONS),
             tk.OptionMenu(self.sub_frame, self.base, *self.BASE_OPTIONS),
             tk.OptionMenu(self.sub_frame, self.data, *self.DATA_TYPE_OPTIONS),
+            tk.Entry(self.sub_frame),
             tk.Entry(self.sub_frame),
             tk.Entry(self.sub_frame),
             tk.Checkbutton(self.sub_frame)

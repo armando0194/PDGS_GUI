@@ -4,10 +4,11 @@ import abc
 class PopUp(object, tk.Frame):
     """Abstract base class for a popup window"""
     __metaclass__ = abc.ABCMeta
-    def __init__(self, parent, root):
+    def __init__(self, parent, root, project=None):
         ''' Constructor '''
         tk.Frame.__init__(self, parent)
         self.parent = parent
+        self.project = project
         self.root = root
         self.parent.resizable(width=False, height=False) # Disallows window resizing
         self.validate_notempty = (self.register(self.notEmpty), '%P') # Creates Tcl wrapper for python function. %P = new contents of field after the edit.
