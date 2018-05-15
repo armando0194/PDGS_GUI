@@ -17,7 +17,7 @@ class GUI(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.root = parent
-        self.root.option_add('*font', ('Times', 25, 'bold'))
+        self.root.option_add('*font', ('Times', 30, 'bold'))
         self.openwindow()
 
     def openwindow(self):
